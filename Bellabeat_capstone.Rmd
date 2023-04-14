@@ -4,7 +4,6 @@ author: "Hawa"
 date: "2023-04-07"
 output:
   html_document: default
-  pdf_document: default
 ---
 
 ```{r setup, include=FALSE}
