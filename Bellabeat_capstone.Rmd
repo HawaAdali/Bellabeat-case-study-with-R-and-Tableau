@@ -1,0 +1,142 @@
+---
+title: "Bellabeat_capstone"
+author: "Hawa"
+date: "2023-04-07"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+Find some trends from Fitbit data from 12 April 2016 to 12 May 2016.  
+There're 18 files in this dataset. so I choose only 4 files to calculate.  
+That is daily activity, heart rate, sleep, and hour calories.  
+I also use this file to reference the meaning of some field >> [fitabase](https://www.fitabase.com/media/1930/fitabasedatadictionary102320.pdf)
+
+
+## Daily activity-step, calories and sedentary data
+
+First of all, I try to find some trends in activity data that involve the step, calories and sedentary data.
+
+Import .csv file and preview the data
+```{r import activity data, echo=TRUE}
+install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+library(tidyverse)
+daily_activity <- read.csv("dailyActivity_merged.csv")
+glimpse(daily_activity)
+```
+
+I change the column names to prevent me from typing a wrong code. The activity_date column also be character, so I change this column to date.
+
+```{r clean activity data, echo=TRUE}
+install.packages("janitor", repos = "http://cran.us.r-project.org")
+library(janitor)
+daily_activity <- clean_names(daily_activity)
+library(lubridate)
+daily_activity$activity_date <- mdy(daily_activity$activity_date)
+glimpse(daily_activity)
+```
+
+
+I also interest in length of device usage. How long they use their device?
+So I decided to plot a graph to see how many users still use the device when time passes.
+
+```{r plot activity decreasing,echo=TRUE}
+install.packages("ggplot2")
+ggplot(data=daily_activity, aes(activity_date))+geom_bar(fill="#0071bc")+
+  geom_text(aes(label = ..count..), stat = "count", vjust = 1.25,color = "white")+labs(title = "The number of device usage within a month.")
+```
+
+The graph shows that the number of devices usage decreases by 36% when a month passes, the data for the period being relatively short. Maybe it's better if we get more record days.
+
+
+In addition, this data may useful for users to gain them more activity. 
+The data show the more steps the more calories burn.
+
+```{r plot step vs calories,echo=TRUE}
+ggplot(data=daily_activity, aes(total_steps,calories))+geom_point()+geom_smooth()+labs(title = "Relationship between total steps and calories burn")
+```
+
+
+## Pattern of heart rate function usage.
+
+Start with import data.
+```{r import heart rate data,echo=TRUE}
+heart_rate <- read.csv("heartrate_seconds_merged.csv")
+glimpse(heart_rate)
+```
+Separate date from time.
+```{r clean heart rate data,echo=TRUE}
+heart_rate$Time <- mdy_hms(heart_rate$Time)
+heart_rate_sep <- heart_rate %>% separate(Time, into=c("Date","time","shift"), sep=" ") %>% separate(time, into=c("hour","minute","sec"), sep=":")
+glimpse(heart_rate_sep)
+```
+Plot a graph.
+```{r plot hour usage,echo=TRUE}
+ggplot(data=heart_rate_sep)+ geom_bar(aes(x=hour),fill="#981b1e")+labs(title = "Heart rate function usage in each hour")
+```
+The graph indicates that heart rate function usage decreases between 23.00 and 6.00.
+And the next graph shows that the number of heart function usage also decreases when a month passes, similar to other functions.
+
+```{r plot number heart decresing,echo=TRUE}
+user_heart_active <- heart_rate_sep %>% group_by(Date) %>% summarise(count=n_distinct(Id))
+ggplot(data=user_heart_active,aes(x=Date,y=count),)+ geom_col(fill="#981b1e")+theme(axis.text.x = element_text(angle = 45))+labs(title = "The number of heart rate function usage within a month.")
+```
+
+##Sleep function usage
+
+For sleep data, I found that the function usage was decreasing as well.
+
+import data
+```{r import sleep data ,echo=TRUE}
+sleep <- read.csv("sleepDay_merged.csv")
+glimpse(sleep)
+```
+
+clean data
+```{r clean sleep data ,echo=TRUE}
+sleep$SleepDay <- mdy_hms(sleep$SleepDay)
+sleep_sep <- sleep %>% separate(SleepDay, into=c("Date","time","shift"), sep=" ")
+glimpse(sleep_sep)
+```
+First, I find the number of users.
+```{r number of users ,echo=TRUE}
+count(sleep,Id)
+```
+Only 24 users report their sleep record and not everyone report full data. And the graph below show that sleep function usage also decrease when time passed as well.
+```{r plot number of sleep ,echo=TRUE}
+user_sleep_active <- sleep_sep %>% group_by(Date) %>% summarise(count=n_distinct(Id))
+ggplot(data=user_sleep_active,aes(x=Date,y=count),)+ geom_col(fill="#981b1e")+theme(axis.text.x = element_text(angle = 45))+labs(title = "The number of sleep function usage within a month")
+```
+Next, I calculate fall asleep time to see some trends.
+```{r fall asleep time, echo=TRUE }
+fall_asleep <- sleep_sep %>% mutate(fall_asleep_time = TotalTimeInBed -TotalMinutesAsleep)
+glimpse(fall_asleep)
+```
+First, I find the max time user used to fall asleep.
+```{r max time, echo=TRUE}
+arrange_desc_fallassleep <- fall_asleep %>% arrange(desc(fall_asleep_time))
+head(arrange_desc_fallassleep)
+```
+The max time is very high, more than 6 hours. And when I detect id filed, it's look like some users encountered insomnia. Especially, id 3977333714.
+```{r plot fall asleep time, echo=TRUE}
+ggplot(data = fall_asleep, aes(x=Date,y=fall_asleep_time))+geom_col(fill="#112e51")+facet_wrap(~Id)+labs(title="Fall asleep time of each user")
+```
+Next, I find the correlation between sedentary time and sleep time.
+```{r}
+sed_sleep <- merge(daily_activity,sleep_sep, by.x = c("id","activity_date"), by.y = c("Id","Date"))
+ggplot(data = sed_sleep, aes(x=TotalMinutesAsleep,y=sedentary_minutes))+geom_point()+geom_smooth()
+```
+There are correlation between sedentary time and asleep time. When the sedentary time decrease sleep time increase. In other words, more movement in life can increase asleep time.
+
+
+
+## Calories burn
+
+Next, I'd like to know overall habit of users about their calories burned. I decided to use Tableau instead.  
+
+![](calories_function_usage.png) ![](avg_calories_hour.png)  
+The number of usage decreases when a month nearly end.  
+Additional, users burned their calories at 17.00-19.00 the most. Followed by 12.00-14.00.
